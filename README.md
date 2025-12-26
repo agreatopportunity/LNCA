@@ -67,7 +67,7 @@ A full-stack Lightning Network application combining **L402 AI payments**, **Nos
 
 ```bash
 # 1. Clone the repository
-[git clone https://github.com/yourusername/lightning-hub.git](https://github.com/agreatopportunity/LNCA.git)
+git clone https://github.com/agreatopportunity/LNCA.git
 cd lightning-hub
 
 # 2. Install backend dependencies
