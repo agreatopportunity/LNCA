@@ -1,0 +1,43 @@
+{
+  "name": "lightning-messaging-hub",
+  "version": "0.1.0",
+  "description": "Lightning Network messaging hub with L402 AI gateway, Nostr chat, and Cashu privacy",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "lightning",
+    "bitcoin",
+    "nostr",
+    "cashu",
+    "l402",
+    "lsat",
+    "ai",
+    "chatgpt",
+    "claude",
+    "grok",
+    "oobabooga"
+  ],
+  "author": "Young - Lightning Hub",
+  "license": "MIT",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.9.0",
+    "@grpc/proto-loader": "^0.7.10",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2",
+    "socket.io": "^4.7.2",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

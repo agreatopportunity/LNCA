@@ -1,0 +1,397 @@
+openapi: 3.0.3
+info:
+  title: Lightning Hub L402 API
+  description: |
+    Pay-per-request AI services via Lightning Network L402 protocol.
+    
+    ## Supported Providers
+    - **Oobabooga** - Local inference (text-generation-webui)
+    - **Grok** - xAI's Grok models
+    - **ChatGPT** - OpenAI GPT models
+    - **Claude** - Anthropic Claude models
+    
+    ## L402 Flow
+    1. Make request without auth
+    2. Receive 402 with invoice + macaroon
+    3. Pay Lightning invoice
+    4. Retry with `Authorization: L402 <macaroon>:<preimage>`
+    
+  version: 0.1.0
+  contact:
+    name: Lightning Hub
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  timestamp: { type: integer }
+
+  /v1/providers:
+    get:
+      summary: List AI providers and pricing
+      tags: [AI]
+      responses:
+        '200':
+          description: Available providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        enabled: { type: boolean }
+                        models: { type: array }
+                  pricing:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        pricePerToken: { type: integer }
+
+  /v1/chat:
+    post:
+      summary: Chat completion (L402 protected)
+      tags: [AI]
+      security:
+        - L402: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, messages]
+              properties:
+                provider:
+                  type: string
+                  enum: [oobabooga, grok, chatgpt, claude]
+                  description: AI provider to use
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant, system]
+                      content:
+                        type: string
+                max_tokens:
+                  type: integer
+                  default: 1000
+                temperature:
+                  type: number
+                  default: 0.7
+                stream:
+                  type: boolean
+                  default: false
+            example:
+              provider: claude
+              messages:
+                - role: user
+                  content: "Explain Bitcoin in one sentence"
+              max_tokens: 100
+      responses:
+        '200':
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider: { type: string }
+                  model: { type: string }
+                  content: { type: string }
+                  usage:
+                    type: object
+                    properties:
+                      prompt_tokens: { type: integer }
+                      completion_tokens: { type: integer }
+                      total_tokens: { type: integer }
+                  l402:
+                    type: object
+                    properties:
+                      tokens_charged: { type: integer }
+                      sats_charged: { type: integer }
+        '402':
+          description: Payment required
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+              example: 'L402 macaroon="eyJ...", invoice="lnbc..."'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentChallenge'
+
+  /v1/oobabooga/chat:
+    post:
+      summary: Oobabooga chat (L402 protected)
+      tags: [AI]
+      security:
+        - L402: []
+      requestBody:
+        $ref: '#/components/requestBodies/ChatRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ChatResponse'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+
+  /v1/grok/chat:
+    post:
+      summary: Grok chat (L402 protected)
+      tags: [AI]
+      security:
+        - L402: []
+      requestBody:
+        $ref: '#/components/requestBodies/ChatRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ChatResponse'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+
+  /v1/chatgpt/chat:
+    post:
+      summary: ChatGPT chat (L402 protected)
+      tags: [AI]
+      security:
+        - L402: []
+      requestBody:
+        $ref: '#/components/requestBodies/ChatRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ChatResponse'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+
+  /v1/claude/chat:
+    post:
+      summary: Claude chat (L402 protected)
+      tags: [AI]
+      security:
+        - L402: []
+      requestBody:
+        $ref: '#/components/requestBodies/ChatRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ChatResponse'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+
+  /v1/stats:
+    get:
+      summary: L402 usage statistics
+      tags: [AI]
+      responses:
+        '200':
+          description: Usage stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRevenue: { type: integer }
+                  byProvider:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        requests: { type: integer }
+                        tokens: { type: integer }
+                        sats: { type: integer }
+
+  /api/node/stats:
+    get:
+      summary: Lightning node statistics
+      tags: [Node]
+      responses:
+        '200':
+          description: Node stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pubkey: { type: string }
+                  alias: { type: string }
+                  channels:
+                    type: object
+                    properties:
+                      active: { type: integer }
+                      total: { type: integer }
+                  peers: { type: integer }
+                  capacity:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      local: { type: integer }
+                      remote: { type: integer }
+
+  /api/invoices/create:
+    post:
+      summary: Create Lightning invoice
+      tags: [Invoices]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: integer, description: Amount in sats }
+                memo: { type: string }
+                expiry: { type: integer, default: 3600 }
+      responses:
+        '200':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment_request: { type: string }
+                  r_hash: { type: string }
+
+  /api/cashu/status:
+    get:
+      summary: Cashu wallet status
+      tags: [Cashu]
+      responses:
+        '200':
+          description: Wallet status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected: { type: boolean }
+                  balance: { type: integer }
+                  mintUrl: { type: string }
+
+  /api/messages/profile:
+    get:
+      summary: Get Nostr profile
+      tags: [Nostr]
+      responses:
+        '200':
+          description: Nostr profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pubkey: { type: string }
+                  npub: { type: string }
+                  relays:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        url: { type: string }
+                        connected: { type: boolean }
+
+components:
+  securitySchemes:
+    L402:
+      type: http
+      scheme: L402
+      description: |
+        L402 authentication using macaroon + preimage.
+        Format: `Authorization: L402 <macaroon>:<preimage>`
+
+  schemas:
+    PaymentChallenge:
+      type: object
+      properties:
+        error: { type: string, example: Payment Required }
+        code: { type: string, example: L402_PAYMENT_REQUIRED }
+        provider: { type: string }
+        invoice: { type: string, description: Lightning invoice }
+        macaroon: { type: string, description: Base64 encoded macaroon }
+        payment_hash: { type: string }
+        amount_sats: { type: integer }
+        expires_at: { type: integer }
+
+  requestBodies:
+    ChatRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [messages]
+            properties:
+              messages:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    role: { type: string }
+                    content: { type: string }
+              max_tokens: { type: integer }
+              temperature: { type: number }
+
+  responses:
+    ChatResponse:
+      description: Chat completion
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              provider: { type: string }
+              model: { type: string }
+              content: { type: string }
+              usage:
+                type: object
+
+    PaymentRequired:
+      description: Payment required
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentChallenge'
+
+tags:
+  - name: AI
+    description: L402-protected AI endpoints
+  - name: Node
+    description: Lightning node management
+  - name: Invoices
+    description: Invoice operations
+  - name: Cashu
+    description: Ecash operations
+  - name: Nostr
+    description: Decentralized messaging
+  - name: System
+    description: System endpoints

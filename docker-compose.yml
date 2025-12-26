@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # Lightning Hub Backend
+  # ===========================================
+  lightning-hub:
+    build: ./backend
+    container_name: lightning-hub-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - FRONTEND_URL=http://localhost:5173
+      
+      # LND Connection (adjust paths for your setup)
+      - LND_SOCKET=${LND_SOCKET:-host.docker.internal:10009}
+      - LND_MACAROON_PATH=/lnd/admin.macaroon
+      - LND_TLS_CERT_PATH=/lnd/tls.cert
+      
+      # Nostr
+      - NOSTR_PRIVATE_KEY=${NOSTR_PRIVATE_KEY}
+      - NOSTR_RELAYS=${NOSTR_RELAYS:-wss://relay.damus.io,wss://nos.lol}
+      
+      # Cashu
+      - CASHU_MINT_URL=${CASHU_MINT_URL:-http://cashu-mint:3338}
+      
+      # AI Providers
+      - ENABLE_OOBABOOGA=${ENABLE_OOBABOOGA:-true}
+      - OOBABOOGA_URL=${OOBABOOGA_URL:-http://host.docker.internal:5000}
+      - GROK_API_KEY=${GROK_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      
+      # L402
+      - L402_SECRET_KEY=${L402_SECRET_KEY}
+    volumes:
+      # Mount LND credentials (read-only)
+      - ${LND_DIR:-~/.lnd}:/lnd:ro
+    restart: unless-stopped
+    networks:
+      - lightning-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # Cashu Mint (Optional - for ecash)
+  # ===========================================
+  cashu-mint:
+    image: cashubtc/nutshell:latest
+    container_name: cashu-mint
+    ports:
+      - "3338:3338"
+    environment:
+      - MINT_LISTEN_HOST=0.0.0.0
+      - MINT_LISTEN_PORT=3338
+      - MINT_PRIVATE_KEY=${CASHU_MINT_PRIVATE_KEY}
+      - MINT_LIGHTNING_BACKEND=LndRestWallet
+      - MINT_LND_REST_ENDPOINT=https://host.docker.internal:8080
+      - MINT_LND_REST_CERT=/lnd/tls.cert
+      - MINT_LND_REST_MACAROON=/lnd/admin.macaroon
+    volumes:
+      - ${LND_DIR:-~/.lnd}:/lnd:ro
+      - cashu-data:/app/data
+    restart: unless-stopped
+    networks:
+      - lightning-net
+    profiles:
+      - cashu
+
+  # ===========================================
+  # Redis (Optional - for caching/sessions)
+  # ===========================================
+  redis:
+    image: redis:alpine
+    container_name: lightning-hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - lightning-net
+    profiles:
+      - cache
+
+networks:
+  lightning-net:
+    driver: bridge
+
+volumes:
+  cashu-data:
+  redis-data:
