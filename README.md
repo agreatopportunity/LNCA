@@ -423,6 +423,6 @@ MIT License
 
 ---
 
-Built with ⚡ by Young | Branson, MO
+Built with ⚡ by BuRtRoNiMuS | Network Effect
 
 *"When one teaches, two learn"* - KAIZEN
